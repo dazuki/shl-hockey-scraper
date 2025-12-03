@@ -39,12 +39,14 @@ gp, w, t, l, otw, otl, g, ga, diff, p (all integers)
 ```
 shl-hockey-scraper/
 ├── scraper.py          # Main script (193 lines)
+├── run_scraper.sh      # Cronjob-compatible bash wrapper
 ├── requirements.txt    # requests==2.31.0, beautifulsoup4==4.12.2
 ├── README.md          # User-facing docs
 ├── CLAUDE.md          # This file - project memory for Claude
 ├── .gitignore         # Excludes venv/, *.json, __pycache__/
 ├── venv/              # Python virtual environment (gitignored)
-└── standings.json     # Generated output (gitignored)
+├── standings.json     # Generated output (gitignored)
+└── cron.log           # Cronjob output log (optional, gitignored)
 ```
 
 ## Implementation History
@@ -65,6 +67,10 @@ shl-hockey-scraper/
    - `compare_standings(old, new)` - Detect position/stat changes
    - Modified `main()` to skip save when no changes
    - Reports specific changes to stdout (position shifts, stat updates)
+9. ✅ Cronjob wrapper script:
+   - `run_scraper.sh` - Bash wrapper with absolute paths for cron compatibility
+   - Activates venv, runs scraper, logs with timestamps
+   - Proper exit code handling for monitoring
 
 ### Key Implementation Decisions
 - **Position derivation**: Use `enumerate(rows[1:], start=1)` since no explicit column
@@ -150,15 +156,20 @@ Done!
 - Assumes static HTML (no JavaScript rendering)
 - Scrapes Total table only (ignores Home/Away)
 - Only keeps current standings (no historical data)
-- No scheduling/automation (manual execution)
 - No pagination handling (assumes single-page table)
 
+## Automation
+**Cronjob setup**: Use `run_scraper.sh` for scheduled execution
+```bash
+# Example: hourly scraping with logging
+0 * * * * /home/dazuki/shl-hockey-scraper/run_scraper.sh >> /home/dazuki/shl-hockey-scraper/cron.log 2>&1
+```
+
 ## Future Considerations
-- Add cron job for automated scraping
 - Store historical data (append vs overwrite)
 - Add Home/Away table options
 - CLI arguments for output file/table selection
 - Data validation (ensure 14 teams, reasonable stats)
 
 ## Last Updated
-2025-12-03 - Added smart comparison system to prevent unnecessary file writes
+2025-12-03 - Added cronjob-compatible bash wrapper script

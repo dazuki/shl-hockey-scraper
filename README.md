@@ -67,6 +67,35 @@ Saved 14 standings to standings.json
 Done!
 ```
 
+## Automated Scheduling
+
+Use `run_scraper.sh` for cronjob execution. Script includes:
+- Absolute paths (cron-compatible)
+- Virtual environment activation
+- Timestamped logging
+- Exit code handling
+
+### Setup Cronjob
+
+```bash
+crontab -e
+```
+
+Add one of these entries:
+
+```bash
+# Every hour
+0 * * * * /home/dazuki/shl-hockey-scraper/run_scraper.sh >> /home/dazuki/shl-hockey-scraper/cron.log 2>&1
+
+# Every 30 minutes
+*/30 * * * * /home/dazuki/shl-hockey-scraper/run_scraper.sh >> /home/dazuki/shl-hockey-scraper/cron.log 2>&1
+
+# Daily at 8 AM
+0 8 * * * /home/dazuki/shl-hockey-scraper/run_scraper.sh >> /home/dazuki/shl-hockey-scraper/cron.log 2>&1
+```
+
+Output logged to `cron.log` with timestamps.
+
 ## Output Format
 
 ```json

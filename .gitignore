@@ -5,6 +5,7 @@ env/
 
 # Output files
 *.json
+!standings.json
 
 # Python cache
 __pycache__/

@@ -6,6 +6,7 @@ Scrapes the Total standings table from sportstatistik.nu and saves to JSON.
 
 import json
 import os
+import subprocess
 import sys
 from datetime import datetime
 from typing import List, Dict, Optional, Tuple
@@ -232,6 +233,47 @@ def save_to_json(data: List[Dict], filename: str) -> bool:
         return False
 
 
+def git_commit_and_push(changes: List[str]) -> bool:
+    """
+    Commit and push standings.json changes to git.
+
+    Args:
+        changes: List of change descriptions from compare_standings
+
+    Returns:
+        True if successful, False otherwise
+    """
+    try:
+        # Generate concise commit message
+        if len(changes) == 1:
+            msg = changes[0]
+        else:
+            # Check for position changes
+            pos_changes = [c for c in changes if ' pos ' in c]
+            if pos_changes:
+                msg = pos_changes[0] if len(pos_changes) == 1 else f"{len(pos_changes)} pos changes"
+            else:
+                msg = f"{len(changes)} teams updated"
+
+        # Add and commit
+        subprocess.run(['git', 'add', OUTPUT_FILE], check=True, capture_output=True)
+        subprocess.run(['git', 'commit', '-m', msg], check=True, capture_output=True)
+
+        # Push to remote
+        result = subprocess.run(['git', 'push'], check=True, capture_output=True, text=True)
+        print(f"Pushed to remote: {msg}")
+        return True
+
+    except subprocess.CalledProcessError as e:
+        print(f"Warning: Git operation failed: {e}", file=sys.stderr)
+        if e.stderr:
+            print(e.stderr, file=sys.stderr)
+        return False
+    except Exception as e:
+        print(f"Warning: Failed to commit/push: {e}", file=sys.stderr)
+        return False
+
+
 def main():
     """Main execution function."""
     # Load existing standings
@@ -262,13 +304,20 @@ def main():
             print(f"  - {change}")
         print()
 
+        # Save to JSON
+        success = save_to_json(standings, OUTPUT_FILE)
+        if not success:
+            sys.exit(1)
+
+        # Commit and push changes
+        git_commit_and_push(changes)
+
     else:
         print("No existing standings.json - creating new file")
-
-    # Save to JSON
-    success = save_to_json(standings, OUTPUT_FILE)
-    if not success:
-        sys.exit(1)
+        # Save to JSON
+        success = save_to_json(standings, OUTPUT_FILE)
+        if not success:
+            sys.exit(1)
 
     print("Done!")
 

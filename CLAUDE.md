@@ -18,15 +18,26 @@ Python web scraper that extracts current SHL (Swedish Hockey League) standings f
 - **Library**: BeautifulSoup4 + requests (static HTML parsing)
 - **Target**: Total standings table only (not Home/Away)
 - **Table Structure**: 11 columns per row (no explicit position column - derived from row index)
-- **Output**: JSON with timestamp, league info, 14 teams × 12 fields each
-- **Comparison Logic**: Detects position changes, stat changes, team additions/removals
+- **Output**: API-ready JSON with metadata, 14 teams × 16 fields each (12 scraped + 4 calculated)
+- **Season Detection**: Auto-calculated based on date (Sept-April SHL calendar)
+- **Calculated Stats**: win%, PPG, GPG, games remaining (computed from scraped values)
+- **Comparison Logic**: Detects position/stat changes, ignores calculated fields
 - **Smart Updates**: Only overwrites file when changes detected
 
 ### Columns Extracted
+**Scraped values:**
 ```
 position (1-14, derived)
 team (string)
-gp, w, t, l, otw, otl, g, ga, diff, p (all integers)
+games_played, wins, ties, losses, ot_wins, ot_losses, goals_for, goals_against, goal_diff, points (integers)
+```
+
+**Calculated fields:**
+```
+win_percentage (float, 2 decimals) = (wins / games_played) × 100
+points_per_game (float, 2 decimals) = points / games_played
+goals_per_game (float, 2 decimals) = goals_for / games_played
+games_remaining (integer) = 52 - games_played
 ```
 
 ### Error Handling
@@ -71,37 +82,58 @@ shl-hockey-scraper/
    - `run_scraper.sh` - Bash wrapper with absolute paths for cron compatibility
    - Activates venv, runs scraper, logs with timestamps
    - Proper exit code handling for monitoring
+10. ✅ Descriptive JSON keys:
+   - Replaced abbreviations with descriptive names (1-2 words)
+   - `gp`→`games_played`, `w`→`wins`, `t`→`ties`, `l`→`losses`
+   - `otw`→`ot_wins`, `otl`→`ot_losses`, `g`→`goals_for`, `ga`→`goals_against`
+   - `diff`→`goal_diff`, `p`→`points`
+11. ✅ API-ready enhancements:
+   - Added top-level metadata: `api_version`, `season`, `data_source`, `total_games_in_season`
+   - `get_current_season()` - Auto-detect season from date (Sept-April calendar)
+   - Per-team calculated fields: `win_percentage`, `points_per_game`, `goals_per_game`, `games_remaining`
+   - Updated comparison logic to ignore calculated fields (only compare scraped values)
+   - Constants: `TOTAL_GAMES_IN_SEASON=52`, `API_VERSION="1.0.0"`
 
 ### Key Implementation Decisions
 - **Position derivation**: Use `enumerate(rows[1:], start=1)` since no explicit column
 - **Single script**: No need for modules/packages (simple utility)
 - **No async**: Single table, small dataset - requests library sufficient
-- **Metadata in JSON**: Timestamp helps validate data freshness
+- **API-ready output**: Rich metadata + calculated stats for direct consumption
+- **Season auto-detection**: Date-based logic (month >= 9 = current/next year)
+- **Calculated fields**: Computed after parsing, not stored separately
+- **Comparison logic**: Only compare scraped values, ignore calculated/derived fields
 - **Print-based logging**: Lightweight, no logging library needed
-- **Comparison before write**: Avoid unnecessary file writes, report changes to stdout
 - **Team name lookup**: Dict-based comparison for O(1) lookup vs linear search
 
 ## JSON Output Format
 ```json
 {
-  "timestamp": "2025-12-03T15:29:34.148967",
+  "api_version": "1.0.0",
+  "timestamp": "2025-12-03T18:35:11.339257",
+  "season": "2025-2026",
   "league": "SHL",
   "table_type": "Total",
+  "data_source": "https://sportstatistik.nu/hockey/shl/tabell",
+  "total_games_in_season": 52,
   "teams_count": 14,
   "standings": [
     {
       "position": 1,
       "team": "Frölunda HC",
-      "gp": 23,
-      "w": 19,
-      "t": 0,
-      "l": 4,
-      "otw": 0,
-      "otl": 0,
-      "g": 77,
-      "ga": 33,
-      "diff": 44,
-      "p": 57
+      "games_played": 23,
+      "wins": 19,
+      "ties": 0,
+      "losses": 4,
+      "ot_wins": 0,
+      "ot_losses": 0,
+      "goals_for": 77,
+      "goals_against": 33,
+      "goal_diff": 44,
+      "points": 57,
+      "win_percentage": 82.61,
+      "points_per_game": 2.48,
+      "goals_per_game": 3.35,
+      "games_remaining": 29
     },
     ...
   ]
@@ -146,7 +178,7 @@ Found 14 teams in Total standings table
 3 change(s) detected:
   - Frölunda HC: pos 1 → 2
   - Skellefteå AIK: pos 2 → 1
-  - Luleå HF: gp 23→24, w 14→15, g 67→70, ga 55→57, diff 12→13, p 44→47
+  - Luleå HF: games_played 23→24, wins 14→15, goals_for 67→70, goals_against 55→57, goal_diff 12→13, points 44→47
 
 Saved 14 standings to standings.json
 Done!
@@ -172,4 +204,4 @@ Done!
 - Data validation (ensure 14 teams, reasonable stats)
 
 ## Last Updated
-2025-12-03 - Added cronjob-compatible bash wrapper script
+2025-12-03 - Added API-ready enhancements: metadata (api_version, season, data_source), calculated fields (win%, PPG, GPG, games_remaining)

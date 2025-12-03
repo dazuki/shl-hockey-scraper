@@ -5,8 +5,10 @@ Python scraper for extracting SHL (Swedish Hockey League) standings from sportst
 ## Features
 
 - Scrapes Total standings table (14 teams)
-- Extracts all available columns (position, team, GP, W, T, L, OTW, OTL, G, GA, +/-, P)
-- Outputs structured JSON with metadata
+- Extracts all available columns with descriptive names
+- API-ready JSON output with metadata and calculated stats
+- Auto-calculated season detection (Sept-April SHL calendar)
+- Per-team calculated fields: win%, PPG, GPG, games remaining
 - Smart comparison - only updates file when changes detected
 - Reports specific changes (position shifts, stat updates) to stdout
 - Error handling for network and parsing failures
@@ -61,7 +63,7 @@ Found 14 teams in Total standings table
 3 change(s) detected:
   - Frölunda HC: pos 1 → 2
   - Skellefteå AIK: pos 2 → 1
-  - Luleå HF: gp 23→24, w 14→15, g 67→70, ga 55→57, diff 12→13, p 44→47
+  - Luleå HF: games_played 23→24, wins 14→15, goals_for 67→70, goals_against 55→57, goal_diff 12→13, points 44→47
 
 Saved 14 standings to standings.json
 Done!
@@ -98,26 +100,57 @@ Output logged to `cron.log` with timestamps.
 
 ## Output Format
 
+### Top-level Metadata
+- `api_version`: Schema version for tracking format changes
+- `timestamp`: ISO 8601 timestamp of data fetch
+- `season`: Auto-detected season (e.g., "2024-2025")
+- `league`: League identifier ("SHL")
+- `table_type`: Standings type ("Total")
+- `data_source`: Source URL
+- `total_games_in_season`: Regular season game count (52)
+- `teams_count`: Number of teams
+
+### Team Fields
+**Scraped values:**
+- `position`, `team`, `games_played`, `wins`, `ties`, `losses`
+- `ot_wins`, `ot_losses`, `goals_for`, `goals_against`, `goal_diff`, `points`
+
+**Calculated fields:**
+- `win_percentage`: (wins / games_played) × 100
+- `points_per_game`: points / games_played
+- `goals_per_game`: goals_for / games_played
+- `games_remaining`: 52 - games_played
+
+### Example JSON
+
 ```json
 {
-  "timestamp": "2025-12-03T10:30:45.123456",
+  "api_version": "1.0.0",
+  "timestamp": "2025-12-03T18:35:11.339257",
+  "season": "2025-2026",
   "league": "SHL",
   "table_type": "Total",
+  "data_source": "https://sportstatistik.nu/hockey/shl/tabell",
+  "total_games_in_season": 52,
   "teams_count": 14,
   "standings": [
     {
       "position": 1,
-      "team": "Team Name",
-      "gp": 20,
-      "w": 15,
-      "t": 2,
-      "l": 3,
-      "otw": 0,
-      "otl": 0,
-      "g": 95,
-      "ga": 65,
-      "diff": 30,
-      "p": 47
+      "team": "Frölunda HC",
+      "games_played": 23,
+      "wins": 19,
+      "ties": 0,
+      "losses": 4,
+      "ot_wins": 0,
+      "ot_losses": 0,
+      "goals_for": 77,
+      "goals_against": 33,
+      "goal_diff": 44,
+      "points": 57,
+      "win_percentage": 82.61,
+      "points_per_game": 2.48,
+      "goals_per_game": 3.35,
+      "games_remaining": 29
     }
   ]
 }

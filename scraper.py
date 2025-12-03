@@ -19,6 +19,27 @@ from bs4 import BeautifulSoup
 URL = "https://sportstatistik.nu/hockey/shl/tabell"
 OUTPUT_FILE = "standings.json"
 TIMEOUT = 10
+TOTAL_GAMES_IN_SEASON = 52  # SHL regular season
+API_VERSION = "1.0.0"
+
+
+def get_current_season() -> str:
+    """
+    Calculate current SHL season based on date.
+
+    SHL season runs September to April.
+    Returns season in format "YYYY-YYYY" (e.g., "2024-2025").
+    """
+    now = datetime.now()
+    year = now.year
+    month = now.month
+
+    # Sep-Dec: current year / next year
+    # Jan-Aug: previous year / current year
+    if month >= 9:
+        return f"{year}-{year + 1}"
+    else:
+        return f"{year - 1}-{year}"
 
 
 def fetch_page(url: str) -> Optional[str]:
@@ -84,7 +105,8 @@ def parse_standings(html: str) -> Optional[List[Dict]]:
         for position, row in enumerate(rows[1:], start=1):
             cells = row.find_all('td')
 
-            # Expect 11 columns: team, gp, w, t, l, otw, otl, g, ga, diff, p
+            # Expect 11 columns: team, games_played, wins, ties, losses, ot_wins, ot_losses,
+            # goals_for, goals_against, goal_diff, points
             if len(cells) < 11:
                 print(f"Warning: Skipping row with {len(cells)} cells (expected 11)", file=sys.stderr)
                 continue
@@ -93,17 +115,25 @@ def parse_standings(html: str) -> Optional[List[Dict]]:
                 team_data = {
                     "position": position,
                     "team": cells[0].get_text(strip=True),
-                    "gp": int(cells[1].get_text(strip=True)),
-                    "w": int(cells[2].get_text(strip=True)),
-                    "t": int(cells[3].get_text(strip=True)),
-                    "l": int(cells[4].get_text(strip=True)),
-                    "otw": int(cells[5].get_text(strip=True)),
-                    "otl": int(cells[6].get_text(strip=True)),
-                    "g": int(cells[7].get_text(strip=True)),
-                    "ga": int(cells[8].get_text(strip=True)),
-                    "diff": int(cells[9].get_text(strip=True)),
-                    "p": int(cells[10].get_text(strip=True))
+                    "games_played": int(cells[1].get_text(strip=True)),
+                    "wins": int(cells[2].get_text(strip=True)),
+                    "ties": int(cells[3].get_text(strip=True)),
+                    "losses": int(cells[4].get_text(strip=True)),
+                    "ot_wins": int(cells[5].get_text(strip=True)),
+                    "ot_losses": int(cells[6].get_text(strip=True)),
+                    "goals_for": int(cells[7].get_text(strip=True)),
+                    "goals_against": int(cells[8].get_text(strip=True)),
+                    "goal_diff": int(cells[9].get_text(strip=True)),
+                    "points": int(cells[10].get_text(strip=True))
                 }
+
+                # Add calculated fields
+                gp = team_data["games_played"]
+                team_data["win_percentage"] = round((team_data["wins"] / gp * 100) if gp > 0 else 0.0, 2)
+                team_data["points_per_game"] = round((team_data["points"] / gp) if gp > 0 else 0.0, 2)
+                team_data["goals_per_game"] = round((team_data["goals_for"] / gp) if gp > 0 else 0.0, 2)
+                team_data["games_remaining"] = TOTAL_GAMES_IN_SEASON - gp
+
                 standings.append(team_data)
             except (ValueError, AttributeError) as e:
                 print(f"Warning: Failed to parse row data: {e}", file=sys.stderr)
@@ -187,10 +217,11 @@ def compare_standings(old: List[Dict], new: List[Dict]) -> Tuple[bool, List[str]
         if old_team['position'] != new_team['position']:
             changes.append(f"{team_name}: pos {old_team['position']} → {new_team['position']}")
 
-        # Stat changes
+        # Stat changes (only compare raw scraped values, not calculated fields)
         stat_changes = []
-        for key in ['gp', 'w', 't', 'l', 'otw', 'otl', 'g', 'ga', 'diff', 'p']:
-            if old_team[key] != new_team[key]:
+        for key in ['games_played', 'wins', 'ties', 'losses', 'ot_wins', 'ot_losses',
+                    'goals_for', 'goals_against', 'goal_diff', 'points']:
+            if old_team.get(key) != new_team.get(key):
                 stat_changes.append(f"{key} {old_team[key]}→{new_team[key]}")
 
         if stat_changes:
@@ -212,9 +243,13 @@ def save_to_json(data: List[Dict], filename: str) -> bool:
     """
     try:
         output = {
+            "api_version": API_VERSION,
             "timestamp": datetime.now().isoformat(),
+            "season": get_current_season(),
             "league": "SHL",
             "table_type": "Total",
+            "data_source": URL,
+            "total_games_in_season": TOTAL_GAMES_IN_SEASON,
             "teams_count": len(data),
             "standings": data
         }

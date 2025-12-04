@@ -11,7 +11,9 @@ Python web scraper that extracts current SHL (Swedish Hockey League) standings f
 2. fetch_page() → HTTP GET to sportstatistik.nu/hockey/shl/tabell
 3. parse_standings() → Extract first table (Total standings), parse 14 team rows
 4. compare_standings() → Compare old vs new, detect changes
-5. save_to_json() → Write JSON only if changes detected or file missing
+5. generate_commit_message() → Create concise update message from changes
+6. save_to_json() → Write JSON with change tracking, only if changes detected or file missing
+7. git_commit_and_push() → Auto-commit and push using generated message
 ```
 
 ### Technical Details
@@ -23,6 +25,7 @@ Python web scraper that extracts current SHL (Swedish Hockey League) standings f
 - **Calculated Stats**: win%, PPG, GPG, games remaining (computed from scraped values)
 - **Comparison Logic**: Detects position/stat changes, ignores calculated fields
 - **Smart Updates**: Only overwrites file when changes detected
+- **Change Tracking**: update_message (commit msg) + changes array embedded in JSON
 
 ### Columns Extracted
 **Scraped values:**
@@ -49,7 +52,7 @@ games_remaining (integer) = 52 - games_played
 ## Project Structure
 ```
 shl-hockey-scraper/
-├── scraper.py          # Main script (193 lines)
+├── scraper.py          # Main script (375 lines)
 ├── run_scraper.sh      # Cronjob-compatible bash wrapper
 ├── requirements.txt    # requests==2.31.0, beautifulsoup4==4.12.2
 ├── README.md          # User-facing docs
@@ -93,6 +96,12 @@ shl-hockey-scraper/
    - Per-team calculated fields: `win_percentage`, `points_per_game`, `goals_per_game`, `games_remaining`
    - Updated comparison logic to ignore calculated fields (only compare scraped values)
    - Constants: `TOTAL_GAMES_IN_SEASON=52`, `API_VERSION="1.0.0"`
+12. ✅ Change tracking in JSON:
+   - `generate_commit_message(changes)` - Extract commit message generation logic
+   - Added `update_message` field - same message used in git commits
+   - Added `changes` array - detailed list of all changes detected
+   - Enables API consumers to fetch change history without git access
+   - Values: `null`/`[]` on initial creation, populated on updates
 
 ### Key Implementation Decisions
 - **Position derivation**: Use `enumerate(rows[1:], start=1)` since no explicit column
@@ -104,18 +113,23 @@ shl-hockey-scraper/
 - **Comparison logic**: Only compare scraped values, ignore calculated/derived fields
 - **Print-based logging**: Lightweight, no logging library needed
 - **Team name lookup**: Dict-based comparison for O(1) lookup vs linear search
+- **Change tracking**: Embedded in JSON for API consumers, mirroring git commit messages
 
 ## JSON Output Format
 ```json
 {
   "api_version": "1.0.0",
-  "timestamp": "2025-12-03T18:35:11.339257",
+  "timestamp": "2025-12-04T10:15:32.123456",
   "season": "2025-2026",
   "league": "SHL",
   "table_type": "Total",
   "data_source": "https://sportstatistik.nu/hockey/shl/tabell",
   "total_games_in_season": 52,
   "teams_count": 14,
+  "update_message": "Frölunda HC: games_played 22→23, wins 18→19",
+  "changes": [
+    "Frölunda HC: games_played 22→23, wins 18→19, goals_for 74→77, points 54→57"
+  ],
   "standings": [
     {
       "position": 1,
@@ -204,4 +218,4 @@ Done!
 - Data validation (ensure 14 teams, reasonable stats)
 
 ## Last Updated
-2025-12-03 - Added API-ready enhancements: metadata (api_version, season, data_source), calculated fields (win%, PPG, GPG, games_remaining)
+2025-12-04 - Added change tracking to JSON: update_message + changes array matching git commit format

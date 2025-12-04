@@ -230,13 +230,35 @@ def compare_standings(old: List[Dict], new: List[Dict]) -> Tuple[bool, List[str]
     return len(changes) > 0, changes
 
 
-def save_to_json(data: List[Dict], filename: str) -> bool:
+def generate_commit_message(changes: List[str]) -> str:
+    """
+    Generate concise commit message from changes list.
+
+    Args:
+        changes: List of change descriptions
+
+    Returns:
+        Commit message string
+    """
+    if len(changes) == 1:
+        return changes[0]
+
+    # Check for position changes
+    pos_changes = [c for c in changes if ' pos ' in c]
+    if pos_changes:
+        return pos_changes[0] if len(pos_changes) == 1 else f"{len(pos_changes)} pos changes"
+
+    return f"{len(changes)} teams updated"
+
+
+def save_to_json(data: List[Dict], filename: str, changes: Optional[List[str]] = None) -> bool:
     """
     Save standings data to JSON file.
 
     Args:
         data: List of team standings dictionaries
         filename: Output file path
+        changes: Optional list of changes for this update
 
     Returns:
         True if save successful, False otherwise
@@ -251,6 +273,8 @@ def save_to_json(data: List[Dict], filename: str) -> bool:
             "data_source": URL,
             "total_games_in_season": TOTAL_GAMES_IN_SEASON,
             "teams_count": len(data),
+            "update_message": generate_commit_message(changes) if changes else None,
+            "changes": changes if changes else [],
             "standings": data
         }
 
@@ -279,16 +303,7 @@ def git_commit_and_push(changes: List[str]) -> bool:
         True if successful, False otherwise
     """
     try:
-        # Generate concise commit message
-        if len(changes) == 1:
-            msg = changes[0]
-        else:
-            # Check for position changes
-            pos_changes = [c for c in changes if ' pos ' in c]
-            if pos_changes:
-                msg = pos_changes[0] if len(pos_changes) == 1 else f"{len(pos_changes)} pos changes"
-            else:
-                msg = f"{len(changes)} teams updated"
+        msg = generate_commit_message(changes)
 
         # Add and commit
         subprocess.run(['git', 'add', OUTPUT_FILE], check=True, capture_output=True)
@@ -339,8 +354,8 @@ def main():
             print(f"  - {change}")
         print()
 
-        # Save to JSON
-        success = save_to_json(standings, OUTPUT_FILE)
+        # Save to JSON with changes
+        success = save_to_json(standings, OUTPUT_FILE, changes)
         if not success:
             sys.exit(1)
 
@@ -349,7 +364,7 @@ def main():
 
     else:
         print("No existing standings.json - creating new file")
-        # Save to JSON
+        # Save to JSON without changes
         success = save_to_json(standings, OUTPUT_FILE)
         if not success:
             sys.exit(1)

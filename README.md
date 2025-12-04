@@ -11,6 +11,8 @@ Python scraper for extracting SHL (Swedish Hockey League) standings from sportst
 - Per-team calculated fields: win%, PPG, GPG, games remaining
 - Smart comparison - only updates file when changes detected
 - Reports specific changes (position shifts, stat updates) to stdout
+- **Change tracking embedded in JSON** - update message + detailed changes array
+- Auto-commits and pushes changes to git with descriptive messages
 - Error handling for network and parsing failures
 
 ## Setup
@@ -109,6 +111,8 @@ Output logged to `cron.log` with timestamps.
 - `data_source`: Source URL
 - `total_games_in_season`: Regular season game count (52)
 - `teams_count`: Number of teams
+- `update_message`: Concise commit message describing changes (null on initial creation)
+- `changes`: Array of detailed change descriptions (empty array on initial creation)
 
 ### Team Fields
 **Scraped values:**
@@ -126,13 +130,17 @@ Output logged to `cron.log` with timestamps.
 ```json
 {
   "api_version": "1.0.0",
-  "timestamp": "2025-12-03T18:35:11.339257",
+  "timestamp": "2025-12-04T10:15:32.123456",
   "season": "2025-2026",
   "league": "SHL",
   "table_type": "Total",
   "data_source": "https://sportstatistik.nu/hockey/shl/tabell",
   "total_games_in_season": 52,
   "teams_count": 14,
+  "update_message": "Frölunda HC: games_played 22→23, wins 18→19",
+  "changes": [
+    "Frölunda HC: games_played 22→23, wins 18→19, goals_for 74→77, points 54→57"
+  ],
   "standings": [
     {
       "position": 1,

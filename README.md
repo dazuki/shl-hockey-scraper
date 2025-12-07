@@ -172,3 +172,7 @@ Output logged to `cron.log` with timestamps.
 ## Source
 
 Data scraped from: https://sportstatistik.nu/hockey/shl/tabell
+
+## Credits
+
+Built with [Claude Code](https://claude.com/claude-code) assistance, human-supervised.
